@@ -13,100 +13,89 @@ import android.util.Log;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-
-import org.json.JSONArray;
+import com.google.gson.stream.JsonReader;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
-   RecyclerView viewer;
-   ReaderAdapter adapter;
-   MyHandler handher = new MyHandler() ;
+    private RecyclerView viewer;
+    ReaderAdapter adapter;
+    private MyHandler handler;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        log("onCreate");
         setContentView(R.layout.activity_main);
         viewer = findViewById(R.id.reader_show);
-        final LinearLayoutManager layoutManager = new LinearLayoutManager(this);
-        layoutManager.setOrientation(LinearLayoutManager.VERTICAL);
-        viewer.setLayoutManager(layoutManager);
 
-        viewer.addItemDecoration(new DividerItemDecoration(this,DividerItemDecoration.VERTICAL));
-
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        log("onStart");
+        handler = new MyHandler();
         new Thread(new Runnable() {
             @Override
             public void run() {
                 getUrlByGet();
             }
         }).start();
+        LinearLayoutManager manager = new LinearLayoutManager(this);
+        manager.setOrientation(LinearLayoutManager.VERTICAL);
+        viewer.setLayoutManager(manager);
+        viewer.addItemDecoration(new DividerItemDecoration(this,DividerItemDecoration.VERTICAL));
+
     }
 
     private void getUrlByGet() {
-        try {
-           /*連線設定*/
 
+        try {
             URL url = new URL("http://120.110.115.82:8000/api/reading/");
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setReadTimeout(3000);
-            conn.setRequestMethod("GET");
-            conn.setDoInput(true);
-            conn.connect();
             InputStream in = conn.getInputStream();
             InputStreamReader reader = new InputStreamReader(in);
             BufferedReader br = new BufferedReader(reader);
-            String line = new String();
             StringBuffer lines = new StringBuffer();
-            while ((line = br.readLine())!=null)
-            {
+            String line = null;
+            while ((line=br.readLine())!=null){
                 lines.append(line);
             }
             Gson gson = new Gson();
-            List<ReadClass> rs = gson.fromJson(lines.toString()
-                    ,new TypeToken<List<ReadClass>>(){}.getType());
-            handher.setData(rs);
-            Message msg = new Message();
-            Bundle data = new Bundle();
-            msg.setData(data);
-            handher.sendEmptyMessage(0);
+            List<ReadClass> rs = gson.fromJson(lines.toString(), new TypeToken<List<ReadClass>>(){}.getType());
+            handler.setData(rs);
+            handler.sendEmptyMessage(0);
 
         } catch (Exception e) {
-            for (StackTraceElement se :e.getStackTrace()){
-                Log.v("Jacky",se.toString());
-            }
+            for (StackTraceElement se :e.getStackTrace())
+                log(se.toString());
+        }
+
+
+    }
+
+    class MyHandler extends Handler{
+        private List<ReadClass> rs;
+
+        public void setData(List<ReadClass> rs)
+        {
+            this.rs = rs;
+        }
+        @Override
+        public void handleMessage(@NonNull Message msg) {
+            super.handleMessage(msg);
+            adapter = new ReaderAdapter(rs);
+            viewer.setAdapter(adapter);
 
         }
     }
+
 
     public void log(String msg)
     {
         Log.v("Jacky",msg);
     }
 
-    class MyHandler extends Handler {
-        List<ReadClass> data;
-        public void setData(List<ReadClass> data){
-            this.data = data;
-        }
-        @Override
-        public void handleMessage(@NonNull Message msg) {
-            adapter = new ReaderAdapter(data);
-            handher.setData(data);
 
-            viewer.setAdapter(adapter);
-            super.handleMessage(msg);
-        }
-    }
 }
 
